@@ -1,0 +1,14 @@
+{
+  "name": "bussik",
+  "version": "1.0.0",
+  "description": "",
+  "main": "LinearR3.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "James Friend <james@jsdf.co> (http://jsdf.co/)",
+  "license": "ISC",
+  "dependencies": {
+    "glow": "^1.2.2"
+  }
+}
