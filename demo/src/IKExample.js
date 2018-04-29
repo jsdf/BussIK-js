@@ -1,16 +1,16 @@
 // @flow
 
-import Node, {JOINT, EFFECTOR} from './bussik/Node';
+import Node, {JOINT, EFFECTOR} from './lib/Node';
 import {
   VectorR3,
   VectorR3_UnitX,
   VectorR3_UnitY,
   VectorR3_UnitZ,
   VectorR3_Zero,
-} from './bussik/LinearR3';
+} from './lib/LinearR3';
 
-import Jacobian from './bussik/Jacobian';
-import Tree from './bussik/Tree';
+import Jacobian from './lib/Jacobian';
+import Tree from './lib/Tree';
 
 const THREE = require('three');
 
@@ -152,7 +152,7 @@ function DoUpdateStep(
   jacob: Jacobian,
   ikMethod: IKMethod
 ) {
-  if (SleepCounter == 0) {
+  if (SleepCounter === 0) {
     T += Tstep;
     UpdateTargets(T, treeY);
   }
@@ -186,7 +186,7 @@ function DoUpdateStep(
       break;
   }
 
-  if (SleepCounter == 0) {
+  if (SleepCounter === 0) {
     jacob.UpdateThetas(); // Apply the change in the theta values
     jacob.UpdatedSClampValue(targetaa);
     SleepCounter = SleepsPerStep;
@@ -217,12 +217,15 @@ export default class IKExample {
   ikJacobian: Jacobian;
 
   targetInstance: THREE.Object3D;
-  movingInstances: Array<THREE.Object3D>;
+  nodesToLineVertices: Map<Node, THREE.Vector3>;
+  lineGeometry: THREE.Geometry;
   scene: THREE.Scene;
-  // public:
 
+  // public:
   constructor(scene: THREE.Scene, option: IKMethod) {
     this.scene = scene;
+    this.ikNodes = [];
+    this.ikTree = new Tree();
     this.ikMethod = option;
 
     ///create some graphics proxy for the tracking target
@@ -231,6 +234,23 @@ export default class IKExample {
 
     this.BuildKukaIIWAShape();
     this.ikJacobian = new Jacobian(this.ikTree);
+
+    // build line
+    this.nodesToLineVertices = new Map();
+    const lineGeom = new THREE.Geometry();
+    this.ikNodes.forEach(node => {
+      const vert = new THREE.Vector3(0, 0, 0);
+      this.nodesToLineVertices.set(node, vert);
+      lineGeom.vertices.push(vert);
+    });
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: (0x0000ff: number | string),
+    });
+
+    const line = new THREE.Line(lineGeom, lineMaterial);
+    this.scene.add(line);
+    this.lineGeometry = lineGeom;
+
     Reset(this.ikTree, this.ikJacobian);
   }
 
@@ -248,6 +268,13 @@ export default class IKExample {
     let lineColor = new VectorR3(0, 0, 0);
     let lineWidth = 2;
     if (node != null) {
+      parentAccTransform.decompose(
+        this.nodesToLineVertices.get(node),
+        new THREE.Quaternion(),
+        new THREE.Vector3()
+      );
+      this.lineGeometry.verticesNeedUpdate = true;
+
       //  glPushMatrix();
       // const pos = new VectorR3(
       //   parentAccTransform.position.x,
@@ -288,7 +315,7 @@ export default class IKExample {
       //   5
       // );
 
-      //node.DrawNode(node == root); // Recursively draw node and update ModelView matrix
+      //node.DrawNode(node === root); // Recursively draw node and update ModelView matrix
       if (node.left) {
         const localTransform: THREE.Matrix4 = getLocalTransform(node.left);
 
