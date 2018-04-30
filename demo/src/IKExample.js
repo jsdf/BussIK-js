@@ -21,57 +21,6 @@ type IKMethod =
   | 'IK_SDLS'
   | 'IK_DLS_SVD';
 
-// declare class Tree {
-//   Init(): void;
-//   Compute(): void;
-//   GetRoot(): Node;
-//   InsertRoot(root: Node): void;
-//   InsertLeftChild(parent: Node, child: Node): void;
-// }
-
-// declare class Node {
-//   left: ?Node;
-//   right: ?Node;
-//   v: VectorR3;
-//   r: VectorR3;
-//   theta: number;
-
-//   constructor(
-
-//       new VectorR3(0.1, 0.0, 0.0875),
-//       unitz,
-//       0.08,
-//       JOINT,
-//       -1e30,
-//       1e30,
-//       radiansToDegrees(0)
-//     )
-// }
-
-// declare class Jacobian {
-//   constructor(tree: Tree): this;
-//   Reset(): void;
-//   SetJtargetActive(): void;
-//   SetJendActive(): void;
-//   ComputeJacobian(targetaa: Array<VectorR3>): void; // Set up Jacobian and deltaS vectors
-//   CalcDeltaThetasTranspose(): void; // Jacobian transpose method
-//   CalcDeltaThetasDLS(): void; // Damped least squares method
-//   CalcDeltaThetasDLSwithSVD(): void;
-//   CalcDeltaThetasPseudoinverse(): void; // Pure pseudoinverse method
-//   CalcDeltaThetasSDLS(): void; // Selectively damped least squares method
-//   ZeroDeltaThetas(): void;
-//   UpdateThetas(): void; // Apply the change in the theta values
-//   UpdatedSClampValue(targetaa: Array<VectorR3>): void;
-// }
-
-// declare class VectorR3 {
-//   x: number;
-//   y: number;
-//   z: number;
-//   constructor(x: number, y: number, z: number): this;
-//   Set(x: number, y: number, z: number): void;
-// }
-
 function radiansToDegrees(angle: number) {
   return angle * (180 / Math.PI);
 }
@@ -81,17 +30,24 @@ function nullthrows<T>(value: ?T): T {
   return value;
 }
 
+function debugPrintVector3(vec: VectorR3 | THREE.Vector3) {
+  return `{x:${vec.x.toFixed(3)},y:${vec.y.toFixed(3)},z:${vec.z.toFixed(3)}}`;
+}
+
 const MAX_NUM_NODE = 1000;
 const MAX_NUM_THETA = 1000;
 const MAX_NUM_EFFECT = 100;
 
 let T = 0;
 let targetaa: Array<VectorR3> = [];
+for (var i = 0; i < MAX_NUM_EFFECT; i++) {
+  targetaa[i] = new VectorR3(0, 0, 0);
+}
 
 // Make slowdown factor larger to make the simulation take larger, less frequent steps
 // Make the constant factor in Tstep larger to make time pass more quickly
 //const SlowdownFactor = 40;
-const SlowdownFactor = 0; // Make higher to take larger steps less frequently
+const SlowdownFactor = 2; // Make higher to take larger steps less frequently
 const SleepsPerStep = SlowdownFactor;
 let SleepCounter = 0;
 //const let Tstep = 0.0005*(let)SlowdownFactor;   // Time step
@@ -119,6 +75,9 @@ let sumErrorSDLS = 0.0;
 // extern let dsnorm[];
 // #endif
 
+const dummyRotation = new THREE.Quaternion();
+const dummyScale = new THREE.Vector3();
+
 function Reset(tree: Tree, ikJacobian: Jacobian) {
   AxesOn = false;
 
@@ -127,7 +86,7 @@ function Reset(tree: Tree, ikJacobian: Jacobian) {
 
   JointLimitsOn = true;
   RestPositionOn = false;
-  UseJacobianTargets1 = false;
+  UseJacobianTargets1 = true;
 
   tree.Init();
   tree.Compute();
@@ -152,10 +111,10 @@ function DoUpdateStep(
   jacob: Jacobian,
   ikMethod: IKMethod
 ) {
-  if (SleepCounter === 0) {
-    T += Tstep;
-    UpdateTargets(T, treeY);
-  }
+  // if (SleepCounter === 0) {
+  //   T += Tstep;
+  //   UpdateTargets(T, treeY);
+  // }
 
   if (UseJacobianTargets1) {
     jacob.SetJtargetActive();
@@ -169,18 +128,18 @@ function DoUpdateStep(
     case 'IK_JACOB_TRANS':
       jacob.CalcDeltaThetasTranspose(); // Jacobian transpose method
       break;
-    // case 'IK_DLS':
-    //   jacob.CalcDeltaThetasDLS(); // Damped least squares method
-    //   break;
+    case 'IK_DLS':
+      jacob.CalcDeltaThetasDLS(); // Damped least squares method
+      break;
     // case 'IK_DLS_SVD':
     //   jacob.CalcDeltaThetasDLSwithSVD();
     //   break;
     // case 'IK_PURE_PSEUDO':
     //   jacob.CalcDeltaThetasPseudoinverse(); // Pure pseudoinverse method
     //   break;
-    // case 'IK_SDLS':
-    //   jacob.CalcDeltaThetasSDLS(); // Selectively damped least squares method
-    //   break;
+    case 'IK_SDLS':
+      jacob.CalcDeltaThetasSDLS(); // Selectively damped least squares method
+      break;
     default:
       jacob.ZeroDeltaThetas();
       break;
@@ -214,67 +173,99 @@ export default class IKExample {
   ikMethod: IKMethod;
   ikTree: Tree;
   ikNodes: Array<Node>;
+  ikEndEffector: Node;
   ikJacobian: Jacobian;
 
   targetInstance: THREE.Object3D;
-  nodesToLineVertices: Map<Node, THREE.Vector3>;
+  nodesToLineVertices: Map<Node, THREE.Vector3> = new Map();
   lineGeometry: THREE.Geometry;
+  debugPoints: Array<THREE.Object3D> = [];
   scene: THREE.Scene;
+  transformControls: Object;
+  debug: {log: string};
 
   // public:
-  constructor(scene: THREE.Scene, option: IKMethod) {
+  constructor(
+    option: IKMethod,
+    scene: THREE.Scene,
+    transformControls: Object,
+    debug: {log: string}
+  ) {
+    this.debug = debug;
     this.scene = scene;
+    this.transformControls = transformControls;
     this.ikNodes = [];
     this.ikTree = new Tree();
     this.ikMethod = option;
-
-    ///create some graphics proxy for the tracking target
-    ///the endeffector tries to track it using Inverse Kinematics
-    this.targetInstance = this.makeTarget();
 
     this.BuildKukaIIWAShape();
     this.ikJacobian = new Jacobian(this.ikTree);
 
     // build line
-    this.nodesToLineVertices = new Map();
-    const lineGeom = new THREE.Geometry();
-    this.ikNodes.forEach(node => {
-      const vert = new THREE.Vector3(0, 0, 0);
-      this.nodesToLineVertices.set(node, vert);
-      lineGeom.vertices.push(vert);
-    });
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: (0x0000ff: number | string),
-    });
+    // const lineGeom = new THREE.Geometry();
+    // this.ikNodes.forEach(node => {
+    //   const vert = new THREE.Vector3(0, 0, 0);
+    //   this.nodesToLineVertices.set(node, vert);
+    //   lineGeom.vertices.push(vert);
+    // });
+    // const lineMaterial = new THREE.LineBasicMaterial({
+    //   color: (0x0000ff: number | string),
+    // });
 
-    const line = new THREE.Line(lineGeom, lineMaterial);
-    this.scene.add(line);
-    this.lineGeometry = lineGeom;
+    // const line = new THREE.Line(lineGeom, lineMaterial);
+    // this.scene.add(line);
+    // this.lineGeometry = lineGeom;
 
     Reset(this.ikTree, this.ikJacobian);
+
+    // populate geometry positions
+    this.renderScene();
+
+    ///create some graphics proxy for the tracking target
+    ///the endeffector tries to track it using Inverse Kinematics
+    // this.targetInstance = this.makeTarget(
+    //   lineGeom.vertices[lineGeom.vertices.length - 1]
+    // );
+
+    DoUpdateStep(1, this.ikTree, this.ikJacobian, this.ikMethod);
+    this.ikNodes.forEach(node => {
+      const point = this.makeBox(0.1, Math.random() * 0xffffff);
+      this.debugPoints.push(point);
+      this.scene.add(point);
+    });
+    this.updateDebugPoints();
+
+    this.targetInstance = this.makeTarget(this.ikEndEffector.s);
   }
 
-  makeTarget(): THREE.Object3D {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({
-      color: (0x00ff00: number | string),
-    });
+  updateDebugPoints() {
+    for (var i = 0; i < this.debugPoints.length; i++) {
+      const pos = this.ikNodes[i].s;
+      this.debugPoints[i].position.set(pos.x, pos.y, pos.z);
+    }
+  }
+
+  makeBox(size: number, color: number | string) {
+    const geometry = new THREE.BoxGeometry(size, size, size);
+    const material = new THREE.MeshBasicMaterial({color});
     const cube = new THREE.Mesh(geometry, material);
+    return cube;
+  }
+
+  makeTarget(pos: VectorR3): THREE.Object3D {
+    const cube = this.makeBox(1, 0x00ff00);
+    // cube.position.copy(pos);
+    // cube.position.set(1, 1, 1);
+    cube.position.set(pos.x, pos.y, pos.z);
     this.scene.add(cube);
+    this.transformControls.attach(cube);
     return cube;
   }
 
   MyDrawTree(node: ?Node, parentAccTransform: THREE.Matrix4): void {
-    let lineColor = new VectorR3(0, 0, 0);
-    let lineWidth = 2;
+    // let lineColor = new VectorR3(0, 0, 0);
+    // let lineWidth = 2;
     if (node != null) {
-      parentAccTransform.decompose(
-        this.nodesToLineVertices.get(node),
-        new THREE.Quaternion(),
-        new THREE.Vector3()
-      );
-      this.lineGeometry.verticesNeedUpdate = true;
-
       //  glPushMatrix();
       // const pos = new VectorR3(
       //   parentAccTransform.position.x,
@@ -315,6 +306,13 @@ export default class IKExample {
       //   5
       // );
 
+      // const lineVert = this.nodesToLineVertices.get(node);
+      // parentAccTransform.decompose(lineVert, dummyRotation, dummyScale);
+      // lineVert && lineVert.set(node.s.x, node.s.y, node.s.z);
+      // this.lineGeometry.verticesNeedUpdate = true;
+
+      // this.debug.log += JSON.stringify(lineVert) + '\n';
+
       //node.DrawNode(node === root); // Recursively draw node and update ModelView matrix
       if (node.left) {
         const localTransform: THREE.Matrix4 = getLocalTransform(node.left);
@@ -347,13 +345,39 @@ export default class IKExample {
     }
   }
   stepSimulation(deltaTime: number): void {
+    targetaa[0].Set(
+      this.targetInstance.position.x,
+      this.targetInstance.position.y,
+      this.targetInstance.position.z
+    );
+    // targetaa[0].Set(0.374, 0, 3);
+    this.debug.log += `targetaa[0]${targetaa[0].toString()}\n`;
     DoUpdateStep(deltaTime, this.ikTree, this.ikJacobian, this.ikMethod);
   }
   renderScene(): void {
-    let localTransform: THREE.Matrix4 = getLocalTransform(
-      nullthrows(this.ikTree.GetRoot())
-    );
-    this.MyDrawTree(this.ikTree.GetRoot(), localTransform);
+    // let localTransform: THREE.Matrix4 = getLocalTransform(
+    //   nullthrows(this.ikTree.GetRoot())
+    // );
+    // this.debug.log += 'MyDrawTree:\n';
+    // this.MyDrawTree(this.ikTree.GetRoot(), localTransform);
+
+    this.debug.log += '\n';
+    this.debug.log +=
+      this.targetInstance &&
+      `targetInstance.position: ${debugPrintVector3(
+        this.targetInstance.position
+      )}\n`;
+
+    this.debug.log +=
+      'ikNodes:\n' +
+      this.ikNodes.map(node => node.s.toString()).join('\n') +
+      '\n';
+
+    this.updateDebugPoints();
+    this.debug.log +=
+      'debugPoints:\n' +
+      this.debugPoints.map(p => debugPrintVector3(p.position)).join('\n') +
+      '\n';
 
     // let pos = new VectorR3(targetaa[0].x, targetaa[0].y, targetaa[0].z);
     // const orn: THREE.Quaternion = new THREE.Quaternion(0, 0, 0, 1);
@@ -368,15 +392,15 @@ export default class IKExample {
   }
 
   BuildKukaIIWAShape() {
-    //const unitx:VectorR3  = VectorR3_UnitX;
-    const unity: VectorR3 = VectorR3_UnitY;
-    const unitz: VectorR3 = VectorR3_UnitZ;
+    //const unitx:VectorR3  = VectorR3_UnitX();
+    const unity: VectorR3 = VectorR3_UnitY();
+    const unitz: VectorR3 = VectorR3_UnitZ();
     const unit1: VectorR3 = new VectorR3(
       Math.sqrt(14.0) / 8.0,
       1.0 / 8.0,
       7.0 / 8.0
     );
-    const zero: VectorR3 = VectorR3_Zero;
+    const zero: VectorR3 = VectorR3_Zero();
 
     const minTheta = -4 * Math.PI;
     const maxTheta = 4 * Math.PI;
@@ -467,5 +491,6 @@ export default class IKExample {
       EFFECTOR
     );
     this.ikTree.InsertLeftChild(this.ikNodes[6], this.ikNodes[7]);
+    this.ikEndEffector = this.ikNodes[7];
   }
 }
