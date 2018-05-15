@@ -24,7 +24,7 @@ camera.position.z = 5;
 camera.position.set(0, 20, 10);
 
 const renderer = new THREE.WebGLRenderer();
-renderer.setClearColor(0xffffff, 1);
+renderer.setClearColor(0xeeeeee, 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body && document.body.appendChild(renderer.domElement);
 const debugTextEl = document.createElement('pre');

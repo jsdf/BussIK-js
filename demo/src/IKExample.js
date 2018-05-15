@@ -201,60 +201,56 @@ export default class IKExample {
     this.BuildKukaIIWAShape();
     this.ikJacobian = new Jacobian(this.ikTree);
 
-    // build line
-    // const lineGeom = new THREE.Geometry();
-    // this.ikNodes.forEach(node => {
-    //   const vert = new THREE.Vector3(0, 0, 0);
-    //   this.nodesToLineVertices.set(node, vert);
-    //   lineGeom.vertices.push(vert);
-    // });
-    // const lineMaterial = new THREE.LineBasicMaterial({
-    //   color: (0x0000ff: number | string),
-    // });
-
-    // const line = new THREE.Line(lineGeom, lineMaterial);
-    // this.scene.add(line);
-    // this.lineGeometry = lineGeom;
-
     Reset(this.ikTree, this.ikJacobian);
 
-    // populate geometry positions
-    this.renderScene();
+    DoUpdateStep(1, this.ikTree, this.ikJacobian, this.ikMethod);
+    this.createDebugPoints();
+    this.updateDebugPoints();
 
     ///create some graphics proxy for the tracking target
-    ///the endeffector tries to track it using Inverse Kinematics
-    // this.targetInstance = this.makeTarget(
-    //   lineGeom.vertices[lineGeom.vertices.length - 1]
-    // );
+    this.targetInstance = this.makeTarget(this.ikEndEffector.s);
+  }
 
-    DoUpdateStep(1, this.ikTree, this.ikJacobian, this.ikMethod);
+  createDebugPoints() {
     this.ikNodes.forEach(node => {
       const point = this.makeBox(0.1, Math.random() * 0xffffff);
       this.debugPoints.push(point);
       this.scene.add(point);
     });
-    this.updateDebugPoints();
 
-    this.targetInstance = this.makeTarget(this.ikEndEffector.s);
+    // build line
+    const lineGeom = new THREE.Geometry();
+    this.ikNodes.forEach(node => {
+      const vert = new THREE.Vector3(0, 0, 0);
+      lineGeom.vertices.push(vert);
+    });
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: (0x0000ff: number | string),
+    });
+
+    const line = new THREE.Line(lineGeom, lineMaterial);
+    this.scene.add(line);
+    this.lineGeometry = lineGeom;
   }
 
   updateDebugPoints() {
     for (var i = 0; i < this.debugPoints.length; i++) {
       const pos = this.ikNodes[i].s;
       this.debugPoints[i].position.set(pos.x, pos.y, pos.z);
+      this.lineGeometry.vertices[i].set(pos.x, pos.y, pos.z);
     }
+    this.lineGeometry.verticesNeedUpdate = true;
   }
 
-  makeBox(size: number, color: number | string) {
+  makeBox(size: number, color: number | string, wireframe: boolean = false) {
     const geometry = new THREE.BoxGeometry(size, size, size);
-    const material = new THREE.MeshBasicMaterial({color});
+    const material = new THREE.MeshBasicMaterial({color, wireframe});
     const cube = new THREE.Mesh(geometry, material);
     return cube;
   }
 
   makeTarget(pos: VectorR3): THREE.Object3D {
-    const cube = this.makeBox(1, 0x00ff00);
-    // cube.position.copy(pos);
+    const cube = this.makeBox(0.5, 0x00ff00, true);
     // cube.position.set(1, 1, 1);
     cube.position.set(pos.x, pos.y, pos.z);
     this.scene.add(cube);
@@ -262,88 +258,6 @@ export default class IKExample {
     return cube;
   }
 
-  MyDrawTree(node: ?Node, parentAccTransform: THREE.Matrix4): void {
-    // let lineColor = new VectorR3(0, 0, 0);
-    // let lineWidth = 2;
-    if (node != null) {
-      //  glPushMatrix();
-      // const pos = new VectorR3(
-      //   parentAccTransform.position.x,
-      //   parentAccTransform.position.y,
-      //   parentAccTransform.position.z
-      // );
-
-      // const color = new VectorR3(0, 1, 0);
-      // const pointSize = 10;
-      // this.app.this.renderer.drawPoint(pos, color, pointSize);
-
-      // this.app.this.renderer.drawLine(
-      //   pos,
-      //   pos + 0.05 * parentAccTransform.getBasis().getColumn(0),
-      //   new VectorR3(1, 0, 0),
-      //   lineWidth
-      // );
-      // this.app.this.renderer.drawLine(
-      //   pos,
-      //   pos + 0.05 * parentAccTransform.getBasis().getColumn(1),
-      //   new VectorR3(0, 1, 0),
-      //   lineWidth
-      // );
-      // this.app.this.renderer.drawLine(
-      //   pos,
-      //   pos + 0.05 * parentAccTransform.getBasis().getColumn(2),
-      //   new VectorR3(0, 0, 1),
-      //   lineWidth
-      // );
-
-      // const axisLocal = new VectorR3(node.v.x, node.v.y, node.v.z);
-      // const axisWorld = parentAccTransform.getBasis() * axisLocal;
-
-      // this.app.this.renderer.drawLine(
-      //   pos,
-      //   pos + 0.1 * axisWorld,
-      //   new VectorR3(0.2, 0.2, 0.7),
-      //   5
-      // );
-
-      // const lineVert = this.nodesToLineVertices.get(node);
-      // parentAccTransform.decompose(lineVert, dummyRotation, dummyScale);
-      // lineVert && lineVert.set(node.s.x, node.s.y, node.s.z);
-      // this.lineGeometry.verticesNeedUpdate = true;
-
-      // this.debug.log += JSON.stringify(lineVert) + '\n';
-
-      //node.DrawNode(node === root); // Recursively draw node and update ModelView matrix
-      if (node.left) {
-        const localTransform: THREE.Matrix4 = getLocalTransform(node.left);
-
-        const leftAccTransform: THREE.Matrix4 = parentAccTransform.multiply(
-          localTransform
-        );
-        // this.app.this.renderer.drawLine(
-        //   parentAccTransform.getOrigin(),
-        //   leftAccTransform.getOrigin(),
-        //   lineColor,
-        //   lineWidth
-        // );
-        this.MyDrawTree(node.left, leftAccTransform); // Draw tree of children recursively
-      }
-      //  glPopMatrix();
-      if (node.right) {
-        const localTransform = getLocalTransform(node.right);
-        const rightAccTransform: THREE.Matrix4 = parentAccTransform.multiply(
-          localTransform
-        );
-        // this.app.this.renderer.drawLine(
-        //   parentAccTransform.getOrigin(),
-        //   rightAccTransform.getOrigin(),
-        //   lineColor,
-        //   lineWidth
-        // );
-        this.MyDrawTree(node.right, rightAccTransform); // Draw right siblings recursively
-      }
-    }
-  }
   stepSimulation(deltaTime: number): void {
     targetaa[0].Set(
       this.targetInstance.position.x,
@@ -354,13 +268,8 @@ export default class IKExample {
     this.debug.log += `targetaa[0]${targetaa[0].toString()}\n`;
     DoUpdateStep(deltaTime, this.ikTree, this.ikJacobian, this.ikMethod);
   }
-  renderScene(): void {
-    // let localTransform: THREE.Matrix4 = getLocalTransform(
-    //   nullthrows(this.ikTree.GetRoot())
-    // );
-    // this.debug.log += 'MyDrawTree:\n';
-    // this.MyDrawTree(this.ikTree.GetRoot(), localTransform);
 
+  renderScene(): void {
     this.debug.log += '\n';
     this.debug.log +=
       this.targetInstance &&
@@ -378,17 +287,6 @@ export default class IKExample {
       'debugPoints:\n' +
       this.debugPoints.map(p => debugPrintVector3(p.position)).join('\n') +
       '\n';
-
-    // let pos = new VectorR3(targetaa[0].x, targetaa[0].y, targetaa[0].z);
-    // const orn: THREE.Quaternion = new THREE.Quaternion(0, 0, 0, 1);
-
-    // this.app.this.renderer.writeSingleInstanceTransformToCPU(
-    //   pos,
-    //   orn,
-    //   this.targetInstance
-    // );
-    // this.app.this.renderer.writeTransforms();
-    // this.app.this.renderer.renderScene();
   }
 
   BuildKukaIIWAShape() {
