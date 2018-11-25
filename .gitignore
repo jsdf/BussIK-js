@@ -1,45 +1,21 @@
-# Ignore docs files
-_gh_pages
-_site
-.ruby-version
+# See https://help.github.com/ignore-files/ for more about ignoring files.
 
-# Numerous always-ignore extensions
-*.diff
-*.err
-*.orig
-*.log
-*.rej
-*.swo
-*.swp
-*.zip
-*.vi
-*~
+# dependencies
+/node_modules
 
-# OS or Editor folders
+# testing
+/coverage
+
+# production
+/build
+
+# misc
 .DS_Store
-._*
-Thumbs.db
-.cache
-.project
-.settings
-.tmproj
-*.esproj
-nbproject
-*.sublime-project
-*.sublime-workspace
-.idea
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Komodo
-*.komodoproject
-.komodotools
-
-# Folders to ignore
-node_modules
-bower_components
-
-lib/
-example/output/
-
-main.jsbundle
-
-images/generated/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
