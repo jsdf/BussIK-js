@@ -1,6 +1,6 @@
 # BussIK-js
 
-IK library for JS intended for realtime applications requiring IK solutions for IK chains with many degrees of freedom (eg. redunant robots). 
+IK library for JS intended for realtime applications requiring IK solutions for IK chains with many degrees of freedom/kinematic redundancy. 
 
 Adapted from the C++ source provided at https://www.math.ucsd.edu/~sbuss/ResearchWeb/ikmethods/index.html
 
