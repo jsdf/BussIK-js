@@ -21,7 +21,8 @@ const camera = new THREE.PerspectiveCamera(
 
 camera.position.z = 5;
 
-camera.position.set(0, 20, 10);
+camera.position.set(10, 7, 10);
+camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setClearColor(0xeeeeee, 1);
