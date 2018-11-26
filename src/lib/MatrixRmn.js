@@ -32,6 +32,8 @@ import {VectorR3} from './LinearR3';
 
 import VectorRn from './VectorRn';
 
+const SVD_MAX_ITERATIONS = 100;
+
 function assert(pass: boolean) {
   if (!pass) throw new Error('assertion failed');
 }
@@ -868,7 +870,9 @@ export default class MatrixRmn extends Array<number> {
     };
     let eps = 1.0e-15 * Math.max(w.MaxAbs(), superDiag.MaxAbs());
 
-    while (true) {
+    let iterations = 0; // infinite loops :(
+    while (iterations < SVD_MAX_ITERATIONS) {
+      iterations++;
       let workLeft = this.UpdateBidiagIndices(state, w, superDiag, eps);
       if (!workLeft) {
         break;
