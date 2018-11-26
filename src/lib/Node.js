@@ -2,7 +2,7 @@
 
 import {VectorR3} from './LinearR3';
 
-type Purpose = 'JOINT' | 'EFFECTOR';
+export type Purpose = 'JOINT' | 'EFFECTOR';
 
 export const EFFECTOR = 'EFFECTOR';
 export const JOINT = 'JOINT';
